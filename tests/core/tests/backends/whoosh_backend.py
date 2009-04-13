@@ -31,7 +31,7 @@ class WhooshSearchBackendTestCase(TestCase):
         self.site = WhooshSearchSite()
         self.sb = SearchBackend(site=self.site)
         self.smmi = WhooshMockSearchIndex(MockModel, backend=self.sb)
-        self.site.register(MockModel, WhooshMockSearchIndex)
+        self.site.register('core.mockmodel', WhooshMockSearchIndex)
         
         self.sb.setup()
         self.raw_whoosh = self.sb.index
