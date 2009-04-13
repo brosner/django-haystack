@@ -1,5 +1,3 @@
-from django.db.models import signals, loading
-from django.db.models.base import ModelBase
 from haystack.indexes import BasicSearchIndex
 from haystack.fields import *
 try:
@@ -14,6 +12,9 @@ class AlreadyRegistered(Exception):
 class NotRegistered(Exception):
     pass
 
+class NotAModel(Exception):
+    pass
+
 
 class SearchSite(object):
     """
@@ -23,22 +24,12 @@ class SearchSite(object):
     apps, django.contrib, etc.) as well as customize on a per-site basis what
     indexes should be available (different indexes for different sites, same
     codebase).
-    
-    A SearchSite instance should be instantiated in your URLconf, since all
-    models will have been loaded by that point.
-    
-    The API intentionally follows that of django.contrib.admin's AdminSite as
-    much as it makes sense to do.
     """
     
     def __init__(self):
         self._registry = {}
-        # Force the AppCache to populate. We need it loaded to be able to
-        # register using the generated Model classes, which are only fully there
-        # after the cache is loaded.
-        loading.cache.get_apps()
     
-    def register(self, model, index_class=None):
+    def register(self, model_ct, index_class=None):
         """
         Registers a model with the site.
         
@@ -50,37 +41,66 @@ class SearchSite(object):
         if not index_class:
             index_class = BasicSearchIndex
         
-        if not isinstance(model, ModelBase):
-            raise AttributeError('The model being registered must derive from Model.')
+        if model_ct in self._registry:
+            # raise AlreadyRegistered("The model '%s' is already registered." % model_ct)
+            # DRL_FIXME: Issue a warning instead?
+            return
         
-        if model in self._registry:
-            raise AlreadyRegistered('The model %s is already registered' % model.__class__)
-        
-        self._registry[model] = index_class(model)
-        self._setup_signals(model, self._registry[model])
+        self._registry[model_ct] = index_class(model_ct)
     
     def unregister(self, model):
         """
         Unregisters a model from the site.
         """
-        if model not in self._registry:
-            raise NotRegistered('The model %s is not registered' % model.__class__)
-        self._teardown_signals(model, self._registry[model])
-        del(self._registry[model])
+        ct = self.get_model_ct(model)
+        
+        if ct not in self._registry:
+            # raise NotRegistered("The model '%s' is not registered." % ct)
+            # DRL_FIXME: Issue a warning instead?
+            return
+        
+        self._teardown_signals(model, self._registry[ct])
+        del(self._registry[ct])
+    
+    def get_model_ct(self, model):
+        """
+        From a Model instance, get the appropriate Content-Type for lookup.
+        """
+        if not hasattr(model, '_meta'):
+            # raise NotAModel("That object does not appear to be a Django model.")
+            # DRL_FIXME: Issue a warning instead?
+            return ""
+        
+        return "%s.%s" % (model._meta.app_label, model._meta.module_name)
+    
+    def activate(self, model):
+        ct = self.get_model_ct(model)
+        
+        if ct in self._registry:
+            # Since we know about this model, setup everything needed to track it.
+            self._setup_signals(model, self._registry[ct])
+            return True
+        
+        return False
     
     def _setup_signals(self, model, index):
+        from django.db.models import signals
         signals.post_save.connect(index.update_object, sender=model)
         signals.post_delete.connect(index.remove_object, sender=model)
     
     def _teardown_signals(self, model, index):
+        from django.db.models import signals
         signals.post_save.disconnect(index.update_object, sender=model)
         signals.post_delete.disconnect(index.remove_object, sender=model)
     
     def get_index(self, model):
         """Provide the index that're being used for a particular model."""
-        if model not in self._registry:
-            raise NotRegistered('The model %s is not registered' % model.__class__)
-        return self._registry[model]
+        ct = self.get_model_ct(model)
+        
+        if ct not in self._registry:
+            raise NotRegistered('The model %s is not registered' % ct)
+        
+        return self._registry[ct]
     
     def get_indexes(self):
         """Provide a dict of all indexes that're being used."""
@@ -88,7 +108,14 @@ class SearchSite(object):
     
     def get_indexed_models(self):
         """Provide a list of all models being indexed."""
-        return self._registry.keys()
+        from django.db import models
+        model_list = []
+        model_cts = self._registry.keys()
+        
+        for ct in model_cts:
+            model_list.append(models.get_model(*ct.split('.')))
+        
+        return model_list
     
     def build_unified_schema(self):
         """

@@ -37,8 +37,8 @@ class Command(AppCommand):
 
     def handle_app(self, app, **options):
         # Cause the default site to load.
-        from haystack.models import load_searchsite
-        load_searchsite(None)
+        from haystack.models import load_searchindexes
+        load_searchindexes(None)
         
         from django.db.models import get_models
         from haystack.sites import site, NotRegistered

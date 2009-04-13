@@ -57,25 +57,31 @@ class SearchResult(object):
         return unicode(self.model._meta)
 
 
-# DRL_FIXME: Not sure this works, but need something along these lines to make
-#            sure the SearchSite(s) are loaded all the time (like the shell), not
-#            just when hitting the website.
-#            * This DOES work when running tests.
-#            * This doesn't matter during web hits (loaded by URLconf).
-#            * The only remaining bit to test is the shell and scripts.
 # Make sure the site gets loaded.
-def load_searchsite(sender, **kwargs):
-    print "Checking the app cache... [%s]" % sender
+def load_searchindexes(sender, **kwargs):
+    from haystack.sites import site
     
-    if models.loading.cache.app_cache_ready():
-        import sys
+    if not load_searchindexes.previously_installed_models_loaded:
         from django.conf import settings
         
-        # Check to make sure it's not already loaded.
-        if not settings.ROOT_URLCONF in sys.modules:
-            print "Loading URLconf to initialize SearchSite..."
-            urlconf = __import__(settings.ROOT_URLCONF)
-            from haystack.sites import site
-            print "Main site registered %s index(es)." % len(site.get_indexed_models())
+        # Need to check through the AppCache for existing models that were
+        # setup before haystack initialized.
+        model_list = models.loading.cache.get_models()
+        
+        for model in model_list:
+            # print "Checking %s..." % model
+            
+            if site.activate(model):
+                print "Activated search for %s..." % model
+        
+        print '---------'
+        load_searchindexes.previously_installed_models_loaded = True
+    
+    # print "Checking %s..." % sender
+    
+    if site.activate(sender):
+        print "Activated search for %s..." % sender
+load_searchindexes.previously_installed_models_loaded = False
 
-models.signals.class_prepared.connect(load_searchsite)
+load_searchindexes(None)
+models.signals.class_prepared.connect(load_searchindexes)

@@ -38,7 +38,7 @@ class SearchIndex(object):
     
     def __init__(self, model, backend=None):
         self.model = model
-        self.backend = backend or haystack.backend.SearchBackend()
+        self._backend = backend
         self.prepared_data = None
         content_fields = []
         
@@ -48,6 +48,18 @@ class SearchIndex(object):
         
         if not len(content_fields) == 1:
             raise SearchFieldError("An index must have one (and only one) SearchField with document=True.")
+    
+    def _get_backend(self):
+        if self._backend is not None:
+            return self._backend
+        
+        # We delay loading as long as possible here to avoid issues when
+        # importing and instantiating in the settings module.
+        from haystack.backends import backend
+        self._backend = backend.SearchBackend()
+        return self._backend
+    
+    backend = property(_get_backend)
     
     def get_query_set(self):
         """
