@@ -117,7 +117,10 @@ class SearchSite(object):
         model_cts = self._registry.keys()
         
         for ct in model_cts:
-            model_list.append(self.get_model(ct))
+            model = self.get_model(ct)
+            
+            if model is not None:
+                model_list.append(model)
         
         return model_list
     
@@ -173,5 +176,5 @@ class SearchSite(object):
         return (content_field_name, fields)
 
 
-# The common case. Feel free to override/replace/define your own in your URLconfs.
+# The common case. Feel free to override/replace/define your own in your ``settings.py``.
 site = SearchSite()
