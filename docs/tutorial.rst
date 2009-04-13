@@ -68,7 +68,7 @@ Example::
 3. Create A ``SearchIndex``
 ---------------------------
 
-Within your URLconf, add the following code::
+Within your ``settings.py``, add the following code::
 
     import haystack
     
@@ -83,7 +83,7 @@ register models in the following manner::
 
     from haystack.sites import site
     
-    site.register(Note)
+    site.register('myapp.note')
 
 This registers the model with the default site built into Haystack. The
 model gets registered with a standard ``SearchIndex`` class. If you need to override
@@ -92,7 +92,7 @@ own indexes like::
 
     from haystack.sites import site
     
-    site.register(Note, NoteIndex)
+    site.register('myapp.note', NoteIndex)
 
 You can also explicitly setup an ``SearchIndex`` as follows::
 
@@ -101,7 +101,7 @@ You can also explicitly setup an ``SearchIndex`` as follows::
     from haystack.sites import SearchIndex
     
     mysite = SearchIndex()
-    mysite.register(Note, NoteIndex)
+    mysite.register('myapp.note', NoteIndex)
 
 
 4. Creating ``SearchIndexes``
@@ -119,7 +119,6 @@ include our own ``SearchIndex`` to exclude indexing future-dated notes::
     import datetime
     from haystack import indexes
     from haystack.sites import site
-    from myapp.models import Note
     
     
     class NoteIndex(indexes.SearchIndex):
@@ -128,11 +127,12 @@ include our own ``SearchIndex`` to exclude indexing future-dated notes::
         pub_date = indexes.DateTimeField(model_attr='pub_date')
         
         def get_query_set(self):
-            "Used when the entire index for model is updated."
+            """Used when the entire index for model is updated."""
+            from myapp.models import Note
             return Note.objects.filter(pub_date__lte=datetime.datetime.now())
     
     
-    site.register(Note, NoteIndex)
+    site.register('myapp.note', NoteIndex)
 
 Every custom ``SearchIndex`` requires there be one and only one field with ``document=True``.
 This is the primary field that will get passed to the backend for indexing. For

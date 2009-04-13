@@ -20,7 +20,6 @@ For the impatient::
     import datetime
     from haystack import indexes
     from haystack.sites import site
-    from myapp.models import Note
     
     
     class NoteIndex(indexes.SearchIndex):
@@ -29,11 +28,12 @@ For the impatient::
         pub_date = indexes.DateTimeField(model_attr='pub_date')
         
         def get_query_set(self):
-            "Used when the entire index for model is updated."
+            """Used when the entire index for model is updated."""
+            from myapp.models import Note
             return Note.objects.filter(pub_date__lte=datetime.datetime.now())
     
     
-    site.register(Note, NoteIndex)
+    site.register('myapp.note', NoteIndex)
 
 
 Background

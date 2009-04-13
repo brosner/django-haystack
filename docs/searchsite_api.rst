@@ -10,7 +10,7 @@ apps, ``django.contrib``, etc.) as well as customize on a per-site basis what
 indexes should be available (different indexes for different sites, same
 codebase).
 
-A ``SearchSite`` instance should be instantiated in your URLconf, since all
+A ``SearchSite`` instance should be instantiated in your ``settings.py``, since all
 models will have been loaded by that point.
 
 
@@ -20,7 +20,7 @@ Autodiscovery
 Since the common use case is to simply grab everything that is indexed for
 search, there is an autodiscovery mechanism which will pull in and register
 all indexes it finds within your project. To enable this, place the following
-inside your ``ROOT_URLCONF``::
+inside your ``settings.py``::
 
     import haystack
     haystack.autodiscover()
@@ -45,16 +45,14 @@ you don't want.::
     haystack.autodiscover()
     
     # Unregister the Rating index.
-    from ratings.models import Rating
-    haystack.sites.site.unregister(Rating)
+    haystack.sites.site.unregister('ratings.rating')
 
 Alternatively, you can manually register only the indexes you want.::
 
     from haystack.sites import site
-    from ratings.models import Rating
     from ratings.search_indexes import RatingIndex
     
-    site.register(Rating, RatingIndex)
+    site.register('ratings.rating', RatingIndex)
 
 
 Method Reference
