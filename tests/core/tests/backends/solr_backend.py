@@ -32,7 +32,7 @@ class SolrSearchBackendTestCase(TestCase):
         self.sb = SearchBackend()
         self.smmi = SolrMockSearchIndex(MockModel, backend=self.sb)
         self.site = SolrSearchSite()
-        self.site.register(MockModel, SolrMockSearchIndex)
+        self.site.register('core.mockmodel', SolrMockSearchIndex)
         
         # Stow.
         self.old_site = sites.site

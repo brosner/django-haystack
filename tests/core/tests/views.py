@@ -31,7 +31,7 @@ class SearchViewTestCase(TestCase):
     
     def test_model_choices(self):
         mis = SearchSite()
-        mis.register(MockModel)
-        mis.register(AnotherMockModel)
+        mis.register('core.mockmodel')
+        mis.register('core.anothermockmodel')
         self.assertEqual(len(model_choices(site=mis)), 2)
         self.assertEqual([option[1] for option in model_choices(site=mis)], [u'another mock models', u'mock models'])

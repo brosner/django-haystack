@@ -265,8 +265,8 @@ class SearchQuerySetTestCase(TestCase):
     
     def test_models(self):
         mock_index_site = SearchSite()
-        mock_index_site.register(MockModel)
-        mock_index_site.register(AnotherMockModel)
+        mock_index_site.register('core.mockmodel')
+        mock_index_site.register('core.anothermockmodel')
         
         bsqs = SearchQuerySet(site=mock_index_site)
         

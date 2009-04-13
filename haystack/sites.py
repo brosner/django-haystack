@@ -48,23 +48,21 @@ class SearchSite(object):
         
         self._registry[model_ct] = index_class(model_ct)
     
-    def unregister(self, model):
+    def unregister(self, model_ct):
         """
         Unregisters a model from the site.
         """
-        ct = self.get_model_ct(model)
-        
-        if ct not in self._registry:
+        if model_ct not in self._registry:
             # raise NotRegistered("The model '%s' is not registered." % ct)
             # DRL_FIXME: Issue a warning instead?
             return
         
-        self._teardown_signals(model, self._registry[ct])
-        del(self._registry[ct])
+        self._teardown_signals(self.get_model(model_ct), self._registry[model_ct])
+        del(self._registry[model_ct])
     
     def get_model_ct(self, model):
         """
-        From a Model instance, get the appropriate Content-Type for lookup.
+        From a Model instance, get the appropriate Content-Type.
         """
         if not hasattr(model, '_meta'):
             # raise NotAModel("That object does not appear to be a Django model.")
@@ -72,6 +70,13 @@ class SearchSite(object):
             return ""
         
         return "%s.%s" % (model._meta.app_label, model._meta.module_name)
+    
+    def get_model(self, model_ct):
+        """
+        From a Content-Type instance, get the appropriate Model.
+        """
+        from django.db import models
+        return models.get_model(*model_ct.split('.'))
     
     def activate(self, model):
         ct = self.get_model_ct(model)
@@ -108,12 +113,11 @@ class SearchSite(object):
     
     def get_indexed_models(self):
         """Provide a list of all models being indexed."""
-        from django.db import models
         model_list = []
         model_cts = self._registry.keys()
         
         for ct in model_cts:
-            model_list.append(models.get_model(*ct.split('.')))
+            model_list.append(self.get_model(ct))
         
         return model_list
     
