@@ -1,3 +1,10 @@
+from haystack.exceptions import MissingDependancy
+
+try:
+    import pysolr
+except ImportError:
+    raise MissingDependancy('No module named pysolr. You need pysolr to use the solr backend.')
+
 from pysolr import Solr
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured

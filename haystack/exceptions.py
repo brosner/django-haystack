@@ -1,0 +1,3 @@
+
+class MissingDependancy(Exception):
+    pass

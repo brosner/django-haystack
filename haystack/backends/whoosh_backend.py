@@ -1,4 +1,12 @@
 import os
+
+from haystack.exceptions import MissingDependancy
+
+try:
+    import whoosh
+except ImportError:
+    raise MissingDependancy('No module named whoosh. You need whoosh before using the whoosh backend.')
+
 from whoosh import store
 from whoosh.fields import Schema, ID, STORED, TEXT, KEYWORD
 import whoosh.index as index
