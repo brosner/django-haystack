@@ -1,20 +1,23 @@
 In Progress
 ===========
 
-* Thread-safety.
-* Better automatic site loading.
+* Docs on faceting.
 * Lucene backend.
 * Formal packaging.
+* Thread-safety (ongoing).
 
 
 Future
 ======
 
-* A means to register multiple ModelIndexes with a Model?
-* A pure Python dummy backend for testing purposes? (Whoosh)
+* Make schema generation more flexible.
 * Distributed read/write setup?
+* A QueueSearchIndex (add to queue for updating instead of immediately firing update)?
 * ModelIndexes to streamline index setup.
+* Spelling support?
+* A pure Python dummy backend for testing purposes? (Whoosh)
 * SearchManager to be attached to Models?
+* A means to register multiple ModelIndexes with a Model?
 
 
 Complete
@@ -48,4 +51,7 @@ Complete
 * A management command to update (last 24 hours).
 * setup.py
 * Why Haystack/History documentation.
-* A means to control commit frequency on updates
+* A means to control commit frequency on updates.
+* Better automatic site loading.
+* Docs on SearchIndexes (prepare's).
+

@@ -9,20 +9,20 @@ __all__ = ['backend']
 
 
 # Load the search backend.
-if not hasattr(settings, "SEARCH_ENGINE"):
-    raise ImproperlyConfigured("You must define the SEARCH_ENGINE setting before using the search framework.")
+if not hasattr(settings, "HAYSTACK_SEARCH_ENGINE"):
+    raise ImproperlyConfigured("You must define the HAYSTACK_SEARCH_ENGINE setting before using the search framework.")
 
 
 def load_backend(backend_name):
     try:
         # Most of the time, the search backend will be one of the  
         # backends that ships with haystack, so look there first.
-        return __import__('haystack.backends.%s_backend' % settings.SEARCH_ENGINE, {}, {}, [''])
+        return __import__('haystack.backends.%s_backend' % settings.HAYSTACK_SEARCH_ENGINE, {}, {}, [''])
     except ImportError, e:
         # If the import failed, we might be looking for a search backend 
         # distributed external to haystack. So we'll try that next.
         try:
-            return __import__('%s_backend' % settings.SEARCH_ENGINE, {}, {}, [''])
+            return __import__('%s_backend' % settings.HAYSTACK_SEARCH_ENGINE, {}, {}, [''])
         except ImportError, e_user:
             # The search backend wasn't found. Display a helpful error message
             # listing all possible (built-in) database backends.
@@ -35,14 +35,14 @@ def load_backend(backend_name):
                 and not f.endswith('.pyc')
             ]
             available_backends.sort()
-            if settings.SEARCH_ENGINE not in available_backends:
+            if settings.HAYSTACK_SEARCH_ENGINE not in available_backends:
                 raise ImproperlyConfigured, "%r isn't an available search backend. Available options are: %s" % \
-                    (settings.SEARCH_ENGINE, ", ".join(map(repr, available_backends)))
+                    (settings.HAYSTACK_SEARCH_ENGINE, ", ".join(map(repr, available_backends)))
             else:
                 raise # If there's some other error, this must be an error in Django itself.
 
 
-backend = load_backend(settings.SEARCH_ENGINE)
+backend = load_backend(settings.HAYSTACK_SEARCH_ENGINE)
 
 
 def autodiscover():
@@ -81,3 +81,31 @@ def autodiscover():
         # Step 3: import the app's search_index file. If this has errors we want them
         # to bubble up.
         __import__("%s.search_indexes" % app)
+
+# Make sure the site gets loaded.
+def handle_registrations(*args, **kwargs):
+    # DRL_TODO: Some day, Django may feature a way to iterate over models without
+    #           loading everything (partial load). When that comes, we'll need a
+    #           version check here.
+    if not handle_registrations.previously_initialized:
+        from django.db import models
+        
+        # Force the AppCache to populate. We need it loaded to be able to
+        # register using the generated Model classes, which are only fully there
+        # after the cache is loaded.
+        models.loading.cache.get_apps()
+        
+        urlconf = __import__(settings.ROOT_URLCONF)
+        from haystack.sites import site
+        
+        if settings.DEBUG:
+            index_count = len(site.get_indexed_models())
+            
+            if index_count:
+                print "Loaded URLconf to initialize SearchSite..."
+                print "Main site registered %s index(es)." % index_count
+        
+        handle_registrations.previously_initialized = True
+
+handle_registrations.previously_initialized = False
+handle_registrations()

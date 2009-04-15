@@ -1,4 +1,5 @@
 import os
+import warnings
 
 from haystack.exceptions import MissingDependancy
 
@@ -39,35 +40,32 @@ class SearchBackend(BaseSearchBackend):
         super(SearchBackend, self).__init__(site)
         self.setup_complete = False
         
-        if not hasattr(settings, 'WHOOSH_PATH'):
-            raise ImproperlyConfigured('You must specify a WHOOSH_PATH in your settings.')
+        if not hasattr(settings, 'HAYSTACK_WHOOSH_PATH'):
+            raise ImproperlyConfigured('You must specify a HAYSTACK_WHOOSH_PATH in your settings.')
     
     def setup(self):
         """
         Defers loading until needed.
         """
-        # DRL_FIXME: This is a workaround to the current SearchSite loading
-        #            issues. Once that is fixed, this may no longer be
-        #            necessary.
         new_index = False
         
         # Make sure the index is there.
-        if not os.path.exists(settings.WHOOSH_PATH):
-            os.makedirs(settings.WHOOSH_PATH)
+        if not os.path.exists(settings.HAYSTACK_WHOOSH_PATH):
+            os.makedirs(settings.HAYSTACK_WHOOSH_PATH)
             new_index = True
         
-        self.storage = store.FileStorage(settings.WHOOSH_PATH)
+        self.storage = store.FileStorage(settings.HAYSTACK_WHOOSH_PATH)
         self.content_field_name, fields = self.site.build_unified_schema()
         self.schema = self.build_schema(fields)
         self.parser = QueryParser(self.content_field_name, schema=self.schema)
         
         if new_index is True:
-            self.index = index.create_in(settings.WHOOSH_PATH, self.schema)
+            self.index = index.create_in(settings.HAYSTACK_WHOOSH_PATH, self.schema)
         else:
             try:
                 self.index = index.Index(self.storage, schema=self.schema)
             except index.EmptyIndexError:
-                self.index = index.create_in(settings.WHOOSH_PATH, self.schema)
+                self.index = index.create_in(settings.HAYSTACK_WHOOSH_PATH, self.schema)
         
         self.setup_complete = True
     
@@ -147,13 +145,13 @@ class SearchBackend(BaseSearchBackend):
     def delete_index(self):
         # Per the Whoosh mailing list, if wiping out everything from the index,
         # it's much more efficient to simply delete the index files.
-        if os.path.exists(settings.WHOOSH_PATH):
-            index_files = os.listdir(settings.WHOOSH_PATH)
+        if os.path.exists(settings.HAYSTACK_WHOOSH_PATH):
+            index_files = os.listdir(settings.HAYSTACK_WHOOSH_PATH)
         
             for index_file in index_files:
-                os.remove(os.path.join(settings.WHOOSH_PATH, index_file))
+                os.remove(os.path.join(settings.HAYSTACK_WHOOSH_PATH, index_file))
         
-            os.removedirs(settings.WHOOSH_PATH)
+            os.removedirs(settings.HAYSTACK_WHOOSH_PATH)
         
         # Recreate everything.
         self.setup()
@@ -187,16 +185,13 @@ class SearchBackend(BaseSearchBackend):
                     reverse = True
         
         if facets is not None:
-            # raise SearchBackendError("Whoosh does not handle faceting.")
-            pass
+            warnings.warn("Whoosh does not handle faceting.", Warning, stacklevel=2)
         
         if date_facets is not None:
-            # raise SearchBackendError("Whoosh does not handle date faceting.")
-            pass
+            warnings.warn("Whoosh does not handle date faceting.", Warning, stacklevel=2)
         
         if query_facets is not None:
-            # raise SearchBackendError("Whoosh does not handle query faceting.")
-            pass
+            warnings.warn("Whoosh does not handle query faceting.", Warning, stacklevel=2)
         
         if narrow_queries is not None:
             # DRL_FIXME: Determine if Whoosh can do this.
@@ -215,7 +210,7 @@ class SearchBackend(BaseSearchBackend):
             }
     
     def more_like_this(self, model_instance):
-        # raise SearchBackendError("Whoosh does not handle More Like This.")
+        warnings.warn("Whoosh does not handle More Like This.", Warning, stacklevel=2)
         return {
             'results': [],
             'hits': 0,
