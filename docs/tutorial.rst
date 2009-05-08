@@ -18,6 +18,13 @@ We'll be adding search functionality to a simple application.  Here is
         def __unicode__(self):
             return self.title
 
+Initial Setup
+-------------
+
+Before starting with Haystack, you will want to choose a search backend to get
+started. There is a quick-start guide to :doc:`installing_search_engines`, though you may
+want to defer to each engine's official instructions.
+
 
 1. Add Haystack To ``INSTALLED_APPS``
 -------------------------------------
@@ -98,9 +105,9 @@ You can also explicitly setup an ``SearchIndex`` as follows::
 
     from myapp.indexes import NoteIndex
     from myapp.models import Note
-    from haystack.sites import SearchIndex
+    from haystack.sites import SearchSite
     
-    mysite = SearchIndex()
+    mysite = SearchSite()
     mysite.register(Note, NoteIndex)
 
 
@@ -176,8 +183,9 @@ with your own view.
 6. Search Template
 ------------------
 
-Your search template will likely be very simple. The following is enough to
-get going (your template/block names will likely differ)::
+Your search template (``search/search.html`` for the default case) will likely
+be very simple. The following is enough to get going (your template/block names
+will likely differ)::
 
     {% extends 'base.html' %}
     

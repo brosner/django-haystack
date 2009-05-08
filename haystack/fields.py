@@ -1,8 +1,5 @@
 from django.template import loader, Context
-
-
-class SearchFieldError(Exception):
-    pass
+from haystack.exceptions import SearchFieldError
 
 
 # All the SearchFields variants.
@@ -38,7 +35,7 @@ class SearchField(object):
         """
         Flatten an object for indexing.
         
-        This loads a template, ``search/indexes/{app_label}/{model_name}.txt``,
+        This loads a template, ``search/indexes/{app_label}/{model_name}_{field_name}.txt``,
         and returns the result of rendering that template. ``object``
         will be in its context.
         """

@@ -28,7 +28,9 @@ Solr
 * Faceting
 * Stored (non-indexed) fields
 * Highlighting
-* Requires: pysolr (GitHub version) + Solr 1.3+
+* Requires: pysolr (`GitHub version`_) + Solr 1.3+
+
+.. _Github version: http://github.com/toastdriven/pysolr
 
 Lucene
 ------
@@ -48,7 +50,9 @@ Whoosh
 * Term Boosting
 * Stored (non-indexed) fields
 * Highlighting
-* Requires: whoosh (0.1.13 w/ included patch or better)
+* Requires: whoosh (`GitHub fork`_)
+
+.. _Github fork: http://github.com/toastdriven/whoosh
 
 
 +----------------+------------------------+---------------------+----------------+------------+----------+---------------+--------------+

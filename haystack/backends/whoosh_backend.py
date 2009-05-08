@@ -1,22 +1,18 @@
 import os
 import warnings
-
-from haystack.exceptions import MissingDependancy
-
-try:
-    import whoosh
-except ImportError:
-    raise MissingDependancy('No module named whoosh. You need whoosh before using the whoosh backend.')
-
-from whoosh import store
-from whoosh.fields import Schema, ID, STORED, TEXT, KEYWORD
-import whoosh.index as index
-from whoosh.qparser import QueryParser
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import force_unicode
-from haystack.backends import BaseSearchBackend, BaseSearchQuery, SearchBackendError
+from haystack.backends import BaseSearchBackend, BaseSearchQuery
+from haystack.exceptions import MissingDependency, SearchBackendError
 from haystack.models import SearchResult
+try:
+    from whoosh import store
+    from whoosh.fields import Schema, ID, STORED, TEXT, KEYWORD
+    import whoosh.index as index
+    from whoosh.qparser import QueryParser
+except ImportError:
+    raise MissingDependency("The 'whoosh' backend requires the installation of 'Whoosh'. Please refer to the documentation.")
 
 
 # Word reserved by Whoosh for special use.
@@ -75,6 +71,9 @@ class SearchBackend(BaseSearchBackend):
             'django_ct_s': ID(stored=True),
             'django_id_s': ID(stored=True),
         }
+        # Grab the number of keys that are hard-coded into Haystack.
+        # We'll use this to (possibly) fail slightly more gracefully later.
+        initial_key_count = len(schema_fields)
         
         for field in fields:
             if field['multi_valued'] is True:
@@ -88,6 +87,11 @@ class SearchBackend(BaseSearchBackend):
                 schema_fields[field['field_name']] = TEXT(stored=True)
             else:
                 raise SearchBackendError("Whoosh backend does not support type '%s'. Please report this bug." % field['type'])
+        
+        # Fail more gracefully than relying on the backend to die if no fields
+        # are found.
+        if len(schema_fields) <= initial_key_count:
+            raise SearchBackendError("No fields were found in any search_indexes. Please correct this before attempting to search.")
         
         return Schema(**schema_fields)
 
@@ -222,7 +226,7 @@ class SearchBackend(BaseSearchBackend):
         
         for raw_result in raw_results:
             raw_result = dict(raw_result)
-            app_label, model_name = raw_result['django_ct_s'].split('.')
+            app_label, module_name = raw_result['django_ct_s'].split('.')
             additional_fields = {}
             
             for key, value in raw_result.items():
@@ -244,7 +248,7 @@ class SearchBackend(BaseSearchBackend):
                     self.content_field_name: [highlight(additional_fields.get(self.content_field_name), terms, sa, ContextFragmenter(terms), UppercaseFormatter())],
                 }
             
-            result = SearchResult(app_label, model_name, raw_result['django_id_s'], raw_result.get('score', 0), **additional_fields)
+            result = SearchResult(app_label, module_name, raw_result['django_id_s'], raw_result.get('score', 0), **additional_fields)
             results.append(result)
         
         return {

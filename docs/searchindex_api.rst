@@ -76,7 +76,7 @@ within which to primarily search. Because this ideal is so central and most of
 Haystack is designed to have pluggable backends, it is important to ensure that
 all engines have at least a bare minimum of the data they need to function.
 
-As a result, when creating a ``SeachIndex``, at least one field must be marked
+As a result, when creating a ``SearchIndex``, at least one field must be marked
 with ``document=True``. This signifies to Haystack that whatever is placed in
 this field while indexing is to be the primary text the search engine indexes.
 The name of this field can be almost anything, but ``text`` is one of the
@@ -108,22 +108,25 @@ For example, one great way to leverage this is to pre-rendering an object's
 search result template DURING indexing. You define an additional field, render
 a template with it and it follows the main indexed record into the index. Then,
 when that record is pulled when it matches a query, you can simply display the
-contents of that field, which avoids the database hit.::
+contents of that field, which avoids the database hit.:
 
-    # myapp/search_indexes.py
-    class MyIndex(indexes.SearchIndex):
+Within ``myapp/search_indexes.py``::
+
+    class NoteIndex(indexes.SearchIndex):
         text = indexes.CharField(document=True, use_template=True)
         author = indexes.CharField(model_attr='user')
         pub_date = indexes.DateTimeField(model_attr='pub_date')
         # Define the additional field.
         rendered = indexes.CharField(use_template=True, indexed=False)
     
-    # templates/search/indexes/myapp/myindex_rendered.txt
+Then, inside a template named ``search/indexes/myapp/note_rendered.txt``::
+
     <h2>{{ object.title }}</h2>
     
     <p>{{ object.content }}</p>
     
-    # templates/search/search.html
+And finally, in ``search/search.html``::
+    
     ...
     
     {% for result in page.object_list %}
@@ -173,6 +176,10 @@ This method should return a single value (or list/tuple/dict) to populate that
 fields data upon indexing. Note that this method takes priority over whatever
 data may come from the field itself.
 
+.. note::
+
+   This method is analagous to Django's ``Form.clean_FOO`` methods.
+
 
 2. ``prepare(self, object)``
 ----------------------------
@@ -207,6 +214,13 @@ an incomplete set of data populating your indexes.
 This method has the final say in all data, overriding both what the fields
 provide as well as any ``prepare_FOO`` methods on the class.
 
+.. note::
+
+   This method is roughly analagous to Django's ``Form.full_clean`` and
+   ``Form.clean`` methods. However, unlike these methods, it is not fired
+   as the result of trying to access ``self.prepared_data``. It requires
+   an explicit call.
+
 
 3. Overriding ``prepare(self, object)`` On Individual ``SearchField`` Objects
 -----------------------------------------------------------------------------
@@ -233,6 +247,10 @@ here, depending on your needs.
 Note that this is NOT a recommended approach to storing geographic data in a
 search engine (there is no formal suggestion on this as support is usually
 non-existent), merely an example of how to extend existing fields.
+
+.. note::
+
+   This method is analagous to Django's ``Field.clean`` methods.
 
 
 Method Reference

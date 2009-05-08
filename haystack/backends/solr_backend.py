@@ -1,17 +1,14 @@
-from haystack.exceptions import MissingDependancy
-
-try:
-    import pysolr
-except ImportError:
-    raise MissingDependancy('No module named pysolr. You need pysolr to use the solr backend.')
-
-from pysolr import Solr
+import sys
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import force_unicode
 from haystack.backends import BaseSearchBackend, BaseSearchQuery
+from haystack.exceptions import MissingDependency
 from haystack.models import SearchResult
-
+try:
+    from pysolr import Solr
+except ImportError:
+    raise MissingDependency("The 'solr' backend requires the installation of 'pysolr'. Please refer to the documentation.")
 
 # Word reserved by Solr for special use.
 RESERVED_WORDS = (
@@ -55,7 +52,7 @@ class SearchBackend(BaseSearchBackend):
                 doc.update(index.prepare(obj))
                 docs.append(doc)
         except UnicodeDecodeError:
-            print "Chunk failed."
+            sys.stderr.write("Chunk failed.\n")
             pass
         
         self.conn.add(docs, commit=commit)
@@ -154,7 +151,7 @@ class SearchBackend(BaseSearchBackend):
                     facets[key][facet_field] = zip(facets[key][facet_field][::2], facets[key][facet_field][1::2])
         
         for raw_result in raw_results.docs:
-            app_label, model_name = raw_result['django_ct_s'].split('.')
+            app_label, module_name = raw_result['django_ct_s'].split('.')
             additional_fields = {}
             
             for key, value in raw_result.items():
@@ -167,7 +164,7 @@ class SearchBackend(BaseSearchBackend):
             if raw_result['id'] in getattr(raw_results, 'highlighting', {}):
                 additional_fields['highlighted'] = raw_results.highlighting[raw_result['id']]
             
-            result = SearchResult(app_label, model_name, raw_result['django_id_s'], raw_result['score'], **additional_fields)
+            result = SearchResult(app_label, module_name, raw_result['django_id_s'], raw_result['score'], **additional_fields)
             results.append(result)
         
         return {

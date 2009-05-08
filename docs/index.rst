@@ -24,6 +24,7 @@ you up and running:
    :maxdepth: 1
    
    faq
+   installing_search_engines
 
 
 Reference
@@ -43,6 +44,7 @@ looking for API documentation and advanced usage as detailed in:
    
    architecture_overview
    backend_support
+   settings
 
 
 Developing
