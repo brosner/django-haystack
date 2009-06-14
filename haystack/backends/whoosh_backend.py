@@ -1,4 +1,6 @@
+import datetime
 import os
+import re
 import warnings
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -27,8 +29,10 @@ RESERVED_WORDS = (
 # The '\\' must come first, so as not to overwrite the other slash replacements.
 RESERVED_CHARACTERS = (
     '\\', '+', '-', '&&', '||', '!', '(', ')', '{', '}', 
-    '[', ']', '^', '"', '~', '*', '?', ':',
+    '[', ']', '^', '"', '~', '*', '?', ':', '.',
 )
+
+DATETIME_REGEX = re.compile('^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})T(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})(\.\d{3,6}Z?)?$')
 
 
 class SearchBackend(BaseSearchBackend):
@@ -111,7 +115,7 @@ class SearchBackend(BaseSearchBackend):
             # Really make sure it's unicode, because Whoosh won't have it any
             # other way.
             for key in other_data:
-                other_data[key] = force_unicode(other_data[key])
+                other_data[key] = self._from_python(other_data[key])
             
             doc.update(other_data)
             writer.update_document(**doc)
@@ -168,12 +172,24 @@ class SearchBackend(BaseSearchBackend):
 
     def search(self, query_string, sort_by=None, start_offset=0, end_offset=None,
                fields='', highlight=False, facets=None, date_facets=None, query_facets=None,
-               narrow_queries=None):
+               narrow_queries=None, **kwargs):
         if not self.setup_complete:
             self.setup()
         
+        # A zero length query should return no results.
         if len(query_string) == 0:
-            return []
+            return {
+                'results': [],
+                'hits': 0,
+            }
+        
+        # A one-character query (non-wildcard) gets nabbed by a stopwords
+        # filter and should yield zero results.
+        if len(query_string) <= 1 and query_string != '*':
+            return {
+                'results': [],
+                'hits': 0,
+            }
         
         reverse = False
         
@@ -181,12 +197,33 @@ class SearchBackend(BaseSearchBackend):
             # Determine if we need to reverse the results and if Whoosh can
             # handle what it's being asked to sort by. Reversing is an
             # all-or-nothing action, unfortunately.
+            sort_by_list = []
+            reverse_counter = 0
+            
             for order_by in sort_by:
                 if order_by.startswith('-'):
-                    if len(sort_by) > 1:
-                        raise SearchBackendError("Whoosh does not handle more than one field being ordered in reverse.")
+                    reverse_counter += 1
+            
+            if len(sort_by) > 1 and reverse_counter > 1:
+                raise SearchBackendError("Whoosh does not handle more than one field and any field being ordered in reverse.")
+            
+            for order_by in sort_by:
+                if order_by.startswith('-'):
+                    sort_by_list.append(order_by[1:])
                     
-                    reverse = True
+                    if len(sort_by_list) == 1:
+                        # DRL_TODO: This is the opposite of what I would expect
+                        # but actual testing with Whoosh confirms it. Very odd.
+                        reverse = False
+                else:
+                    sort_by_list.append(order_by)
+                    
+                    if len(sort_by_list) == 1:
+                        # DRL_TODO: This is the opposite of what I would expect
+                        # but actual testing with Whoosh confirms it. Very odd.
+                        reverse = True
+                
+            sort_by = sort_by_list[0]
         
         if facets is not None:
             warnings.warn("Whoosh does not handle faceting.", Warning, stacklevel=2)
@@ -197,15 +234,29 @@ class SearchBackend(BaseSearchBackend):
         if query_facets is not None:
             warnings.warn("Whoosh does not handle query faceting.", Warning, stacklevel=2)
         
+        narrowed_results = None
+        
         if narrow_queries is not None:
-            # DRL_FIXME: Determine if Whoosh can do this.
-            # kwargs['fq'] = list(narrow_queries)
-            pass
+            # Potentially expensive? I don't see another way to do it in Whoosh...
+            narrow_searcher = self.index.searcher()
+            
+            for nq in narrow_queries:
+                recent_narrowed_results = narrow_searcher.search(self.parser.parse(nq))
+                
+                if narrowed_results:
+                    narrowed_results.filter(recent_narrowed_results)
+                else:
+                   narrowed_results = recent_narrowed_results
         
         if self.index.doc_count:
             searcher = self.index.searcher()
             # DRL_TODO: Ignoring offsets for now, as slicing caused issues with pagination.
             raw_results = searcher.search(self.parser.parse(query_string), sortedby=sort_by, reverse=reverse)
+            
+            # Handle the case where the results have been narrowed.
+            if narrowed_results:
+                raw_results.filter(narrowed_results)
+            
             return self._process_results(raw_results, highlight=highlight, query_string=query_string)
         else:
             return {
@@ -224,18 +275,16 @@ class SearchBackend(BaseSearchBackend):
         results = []
         facets = {}
         
-        for raw_result in raw_results:
+        for doc_offset, raw_result in enumerate(raw_results):
             raw_result = dict(raw_result)
             app_label, module_name = raw_result['django_ct_s'].split('.')
             additional_fields = {}
             
             for key, value in raw_result.items():
-                additional_fields[str(key)] = value
+                additional_fields[str(key)] = self._to_python(value)
             
             del(additional_fields['django_ct_s'])
             del(additional_fields['django_id_s'])
-            # DRL_FIXME: Figure out if there's a way to get the score out of Whoosh.
-            # del(additional_fields['score'])
             
             if highlight:
                 from whoosh import analysis
@@ -248,7 +297,16 @@ class SearchBackend(BaseSearchBackend):
                     self.content_field_name: [highlight(additional_fields.get(self.content_field_name), terms, sa, ContextFragmenter(terms), UppercaseFormatter())],
                 }
             
-            result = SearchResult(app_label, module_name, raw_result['django_id_s'], raw_result.get('score', 0), **additional_fields)
+            # Requires Whoosh 0.1.20+.
+            if hasattr(raw_results, 'score'):
+                score = raw_results.score(doc_offset)
+            else:
+                score = None
+            
+            if score is None:
+                score = 0
+            
+            result = SearchResult(app_label, module_name, raw_result['django_id_s'], score, **additional_fields)
             results.append(result)
         
         return {
@@ -256,6 +314,61 @@ class SearchBackend(BaseSearchBackend):
             'hits': len(results),
             'facets': facets,
         }
+    
+    def _from_python(self, value):
+        """
+        Converts Python values to a string for Whoosh.
+        
+        Code courtesy of pysolr.
+        """
+        if isinstance(value, datetime.datetime):
+            value = force_unicode('%s' % value.isoformat())
+        elif isinstance(value, datetime.date):
+            value = force_unicode('%sT00:00:00' % value.isoformat())
+        elif isinstance(value, bool):
+            if value:
+                value = u'true'
+            else:
+                value = u'false'
+        else:
+            value = force_unicode(value)
+        return value
+    
+    def _to_python(self, value):
+        """
+        Converts values from Whoosh to native Python values.
+        
+        A port of the same method in pysolr, as they deal with data the same way.
+        """
+        if value == 'true':
+            return True
+        elif value == 'false':
+            return False
+        
+        possible_datetime = DATETIME_REGEX.search(value)
+        
+        if possible_datetime:
+            date_values = possible_datetime.groupdict()
+            
+            for dk, dv in date_values.items():
+                date_values[dk] = int(dv)
+            
+            return datetime.datetime(date_values['year'], date_values['month'], date_values['day'], date_values['hour'], date_values['minute'], date_values['second'])
+        
+        try:
+            # This is slightly gross but it's hard to tell otherwise what the
+            # string's original type might have been. Be careful who you trust.
+            converted_value = eval(value)
+            
+            # Try to handle most built-in types.
+            if isinstance(converted_value, (list, tuple, set, dict, int, float, long, complex)):
+                return converted_value
+        except:
+            # If it fails (SyntaxError or its ilk) or we don't trust it,
+            # continue on.
+            pass
+        
+        return value
 
 
 class SearchQuery(BaseSearchQuery):
@@ -284,8 +397,11 @@ class SearchQuery(BaseSearchQuery):
                 
                 value = the_filter.value
                 
-                if isinstance(value, (int, long, float, complex)):
-                    value = str(value)
+                if the_filter.filter_type != 'in':
+                    # 'in' is a bit of a special case, as we don't want to
+                    # convert a valid list/tuple to string. Defer handling it
+                    # until later...
+                    value = self.backend._from_python(value)
                 
                 # Check to see if it's a phrase for an exact match.
                 if ' ' in value:
@@ -302,6 +418,7 @@ class SearchQuery(BaseSearchQuery):
                         'gte': "NOT %s:*..%s",
                         'lt': "%s:*..%s",
                         'lte': "NOT %s:%s..*",
+                        'startswith': "%s:%s*",
                     }
                     
                     if the_filter.filter_type != 'in':

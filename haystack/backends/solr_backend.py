@@ -78,7 +78,7 @@ class SearchBackend(BaseSearchBackend):
 
     def search(self, query_string, sort_by=None, start_offset=0, end_offset=None,
                fields='', highlight=False, facets=None, date_facets=None, query_facets=None,
-               narrow_queries=None):
+               narrow_queries=None, **kwargs):
         if len(query_string) == 0:
             return []
         
@@ -155,7 +155,7 @@ class SearchBackend(BaseSearchBackend):
             additional_fields = {}
             
             for key, value in raw_result.items():
-                additional_fields[str(key)] = value
+                additional_fields[str(key)] = self.conn._to_python(value)
             
             del(additional_fields['django_ct_s'])
             del(additional_fields['django_id_s'])
@@ -200,8 +200,9 @@ class SearchQuery(BaseSearchQuery):
                 
                 value = the_filter.value
                 
-                if isinstance(value, (int, long, float, complex)):
-                    value = str(value)
+                if not isinstance(value, (list, tuple)):
+                    # Convert whatever we find to what pysolr wants.
+                    value = self.backend.conn._from_python(value)
                 
                 # Check to see if it's a phrase for an exact match.
                 if ' ' in value:
@@ -218,6 +219,7 @@ class SearchQuery(BaseSearchQuery):
                         'gte': "%s:[%s TO *]",
                         'lt': "%s:{* TO %s}",
                         'lte': "%s:[* TO %s]",
+                        'startswith': "%s:%s*",
                     }
                     
                     if the_filter.filter_type != 'in':

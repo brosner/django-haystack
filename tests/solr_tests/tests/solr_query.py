@@ -1,3 +1,4 @@
+import datetime
 from django.conf import settings
 from django.test import TestCase
 from haystack.backends.solr_backend import SearchBackend, SearchQuery
@@ -24,6 +25,14 @@ class SolrSearchQueryTestCase(TestCase):
     def test_build_query_single_word(self):
         self.sq.add_filter('content', 'hello')
         self.assertEqual(self.sq.build_query(), 'hello')
+    
+    def test_build_query_boolean(self):
+        self.sq.add_filter('content', True)
+        self.assertEqual(self.sq.build_query(), 'true')
+    
+    def test_build_query_datetime(self):
+        self.sq.add_filter('content', datetime.datetime(2009, 5, 8, 11, 28))
+        self.assertEqual(self.sq.build_query(), '2009-05-08T11:28:00Z')
     
     def test_build_query_multiple_words_and(self):
         self.sq.add_filter('content', 'hello')
@@ -63,6 +72,11 @@ class SolrSearchQueryTestCase(TestCase):
         self.sq.add_filter('title__gte', 'B')
         self.sq.add_filter('id__in', [1, 2, 3])
         self.assertEqual(self.sq.build_query(), 'why AND pub_date:[* TO "2009-02-10 01:59:00"] AND author:{daniel TO *} AND created:{* TO "2009-02-12 12:13:00"} AND title:[B TO *] AND (id:1 OR id:2 OR id:3)')
+    
+    def test_build_query_wildcard_filter_types(self):
+        self.sq.add_filter('content', 'why')
+        self.sq.add_filter('title__startswith', 'haystack')
+        self.assertEqual(self.sq.build_query(), 'why AND title:haystack*')
     
     def test_clean(self):
         self.assertEqual(self.sq.clean('hello world'), 'hello world')

@@ -24,6 +24,7 @@ class QueryFilterTestCase(TestCase):
         self.assertEqual(qf.split_expression('foo__gt'), ('foo', 'gt'))
         self.assertEqual(qf.split_expression('foo__gte'), ('foo', 'gte'))
         self.assertEqual(qf.split_expression('foo__in'), ('foo', 'in'))
+        self.assertEqual(qf.split_expression('foo__startswith'), ('foo', 'startswith'))
         
         self.assertEqual(qf.split_expression('foo__moof'), ('foo', 'exact'))
     
@@ -41,6 +42,11 @@ class QueryFilterTestCase(TestCase):
         self.assertEqual(QueryFilter('foo', 'bar').is_or(), False)
         self.assertEqual(QueryFilter('foo', 'bar', use_not=True).is_or(), False)
         self.assertEqual(QueryFilter('foo', 'bar', use_or=True).is_or(), True)
+    
+    def test_repr(self):
+        self.assertEqual(repr(QueryFilter('foo', 'bar')), '<QueryFilter: AND foo__exact=bar>')
+        self.assertEqual(repr(QueryFilter('foo', 1)), '<QueryFilter: AND foo__exact=1>')
+        self.assertEqual(repr(QueryFilter('foo', datetime.datetime(2009, 5, 12, 23, 17))), '<QueryFilter: AND foo__exact=2009-05-12 23:17:00>')
 
 
 class BaseSearchQueryTestCase(TestCase):
